@@ -17,6 +17,11 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"Status":"Okey"}`))
 	})
+		mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"Status":"Welcome to the home route"}`))
+	})
 	srv := http.Server{
 		Addr:        ":"+cfg.Port,
 		Handler:      mux,
