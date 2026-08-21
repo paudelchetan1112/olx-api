@@ -5,9 +5,12 @@ import (
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/paudelchetan1112/olx-api/internal/config"
 )
 
 func main() {
+	cfg:=config.MustLoad()
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -15,7 +18,7 @@ func main() {
 		w.Write([]byte(`{"Status":"Ok"}`))
 	})
 	srv := http.Server{
-		Addr:         ":8090",
+		Addr:        ":"+cfg.Port,
 		Handler:      mux,
 		ReadTimeout:  time.Second * 10,
 		WriteTimeout: time.Second * 30,
