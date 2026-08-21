@@ -10,20 +10,20 @@ import (
 )
 
 func main() {
-	cfg:=config.MustLoad()
+	cfg := config.MustLoad()
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"Status":"Okey"}`))
 	})
-		mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"Status":"Welcome to the home route"}`))
+		w.Write([]byte(`{"Status":"Welcome to the this api"}`))
 	})
 	srv := http.Server{
-		Addr:        ":"+cfg.Port,
+		Addr:         ":" + cfg.Port,
 		Handler:      mux,
 		ReadTimeout:  time.Second * 10,
 		WriteTimeout: time.Second * 30,
