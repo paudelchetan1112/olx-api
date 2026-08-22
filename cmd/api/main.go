@@ -7,21 +7,21 @@ import (
 	"time"
 
 	"github.com/paudelchetan1112/olx-api/internal/config"
+	"github.com/paudelchetan1112/olx-api/internal/db"
+	"github.com/paudelchetan1112/olx-api/internal/handlers"
 )
 
 func main() {
-	cfg := config.MustLoad()
+	cfg := config.MustLoad() //package which config env variable 
+	_, err:=db.Connect(cfg.DatabaseUrl)
+	if err!=nil{
+		log.Fatalf("Main.db.Connect:%v", err)
+	}
+	fmt.Println("Database Connected")
+		fmt.Println("olx-api is running..")
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"Status":"Okey"}`))
-	})
-	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"Status":"Welcome to the this api"}`))
-	})
+	mux.HandleFunc("GET /healthz", handlers.Healthz)
+
 	srv := http.Server{
 		Addr:         ":" + cfg.Port,
 		Handler:      mux,
@@ -33,6 +33,6 @@ func main() {
 		log.Fatalf("Server failed:%v", err)
 	}
 
-	fmt.Println("Server is running..")
+
 
 }
