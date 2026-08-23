@@ -1,6 +1,7 @@
 package main
 
 import (
+	
 	"fmt"
 	"log"
 	"net/http"
@@ -13,7 +14,7 @@ import (
 
 func main() {
 	cfg := config.MustLoad() //package which config env variable 
-	_, err:=db.Connect(cfg.DatabaseUrl)
+	db, err:=db.Connect(cfg.DatabaseUrl)
 	if err!=nil{
 		log.Fatalf("Main.db.Connect:%v", err)
 	}
@@ -21,6 +22,7 @@ func main() {
 		fmt.Println("olx-api is running..")
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", handlers.Healthz)
+	mux.HandleFunc("GET /listings", handlers.List(db))
 
 	srv := http.Server{
 		Addr:         ":" + cfg.Port,
