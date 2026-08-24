@@ -1,7 +1,6 @@
 package main
 
 import (
-	
 	"fmt"
 	"log"
 	"net/http"
@@ -9,7 +8,7 @@ import (
 
 	"github.com/paudelchetan1112/olx-api/internal/config"
 	"github.com/paudelchetan1112/olx-api/internal/db"
-	"github.com/paudelchetan1112/olx-api/internal/handlers"
+	"github.com/paudelchetan1112/olx-api/internal/router"
 )
 
 func main() {
@@ -20,13 +19,13 @@ func main() {
 	}
 	fmt.Println("Database Connected")
 		fmt.Println("olx-api is running..")
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", handlers.Healthz)
-	mux.HandleFunc("GET /listings", handlers.List(db))
+	
+	
+	router:=router.Router(db)
 
 	srv := http.Server{
 		Addr:         ":" + cfg.Port,
-		Handler:      mux,
+		Handler:      router,
 		ReadTimeout:  time.Second * 10,
 		WriteTimeout: time.Second * 30,
 		IdleTimeout:  time.Second * 60,
