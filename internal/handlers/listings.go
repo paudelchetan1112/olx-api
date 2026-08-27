@@ -7,16 +7,89 @@ import (
 	"log"
 	"net/http"
 	"reflect"
+	"strconv"
+	"strings"
 
 	uuid "github.com/google/uuid"
 	"github.com/paudelchetan1112/olx-api/internal/models"
 )
+type ListingHandler struct{
+	db *sql.DB
+}
+func NewListingHandler(db *sql.DB)*ListingHandler{
+	return &ListingHandler{
+		db: db,
+	}
+}
+func addFilter(r *http.Request, query string, args []interface{}) (string, []interface{}) {
+	var params = map[string]string{
+		"title":       "title",
+		"description": "description",
+		"price":       "price",
+		"city":        "city",
+		"status":      "status",
+		"created_at":  "created_at",
+	}
+	v := 1
+	for param, dbField := range params {
+		value := r.URL.Query().Get(param)
+		if value != "" {
+			query += " AND " + dbField + "=$" + strconv.Itoa(v)
+			v++
+			args=append(args, value)
+		}
+	}
+	return query, args
+}
 
-func List(db *sql.DB) http.HandlerFunc {
+func isValidSortOrder(order string) bool {
+	return order == "asc" || order == "desc"
+}
+func isValidSortField(field string) bool {
+	validField := map[string]bool{
+		"title":       true,
+		"description": true,
+		"price":       true,
+		"city":        true,
+		"status":      true,
+		"created_at":  true,
+	}
+	return validField[field]
+}
+func addSorting(r *http.Request, query string) string {
+	sortparams := r.URL.Query()["sortby"]
+	fmt.Println(sortparams)
+	if len(sortparams) > 0 {
+		query += " ORDER BY"
+		for i, param := range sortparams {
+			fmt.Println(param)
+			parts := strings.Split(param, ":")
+			if len(parts) != 2 {
+				continue
+			}
+			field, order := parts[0], parts[1]
+			if !isValidSortField(field) && !isValidSortOrder(order) {
+				continue
+			}
 
-	return func(w http.ResponseWriter, r *http.Request) {
+			if i > 0 {
+				query += ","
+
+			}
+			query += " " + field + " " + order
+
+		}
+	}
+	return query
+}
+func (lh *ListingHandler)Get(w http.ResponseWriter, r *http.Request) {
 		var lists []models.List
-		rows, err := db.Query("SELECT id, title, description, price, city, status, created_at FROM listings ORDER BY created_at DESC")
+		query := "SELECT id, title, description, price, city, status, created_at FROM listings WHERE 1=1"
+		var args []interface{}
+		query, args = addFilter(r, query, args)
+		query = addSorting(r, query)
+
+		rows, err := lh.db.Query(query, args...)
 		if err != nil {
 			log.Printf("Query:%v", err)
 			http.Error(w, "Error while preparing sql statement", http.StatusInternalServerError)
@@ -47,10 +120,9 @@ func List(db *sql.DB) http.HandlerFunc {
 		json.NewEncoder(w).Encode(response)
 
 	}
-}
 
-func GetOneList(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+
+func (lh *ListingHandler)GetOne(w http.ResponseWriter, r *http.Request) {
 		id, err := uuid.Parse(r.PathValue("id"))
 		fmt.Println(id)
 		if err != nil {
@@ -60,7 +132,7 @@ func GetOneList(db *sql.DB) http.HandlerFunc {
 			return
 		}
 		var list models.List
-		err = db.QueryRow("SELECT id, title, description, price, city, status,created_at  FROM listings WHERE id=$1", id).Scan(&list.ID, &list.Title, &list.Description, &list.Price, &list.City, &list.Status, &list.CreatedAt)
+		err = lh.db.QueryRow("SELECT id, title, description, price, city, status,created_at  FROM listings WHERE id=$1", id).Scan(&list.ID, &list.Title, &list.Description, &list.Price, &list.City, &list.Status, &list.CreatedAt)
 		if err == sql.ErrNoRows {
 			log.Printf("List not found:%v", err)
 			http.Error(w, "List not found", http.StatusNotFound)
@@ -74,9 +146,8 @@ func GetOneList(db *sql.DB) http.HandlerFunc {
 		json.NewEncoder(w).Encode(list)
 
 	}
-}
-func AddList(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+
+func(lh *ListingHandler)AddNew(w http.ResponseWriter, r *http.Request) {
 		var newLists []models.List
 		decoder := json.NewDecoder(r.Body)
 		decoder.DisallowUnknownFields()
@@ -100,7 +171,7 @@ func AddList(db *sql.DB) http.HandlerFunc {
 			}
 
 		}
-		stmt, err := db.Prepare(`INSERT INTO listings(title, description, price, city, status) VALUES($1, $2, $3, $4, $5) RETURNING id, created_at`)
+		stmt, err := lh.db.Prepare(`INSERT INTO listings(title, description, price, city, status) VALUES($1, $2, $3, $4, $5) RETURNING id, created_at`)
 		if err != nil {
 
 			log.Printf("Error preparing query:%v", err)
@@ -136,55 +207,49 @@ func AddList(db *sql.DB) http.HandlerFunc {
 		json.NewEncoder(w).Encode(response)
 
 	}
-}
 
-func DeleteOneList(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+
+func(lh *ListingHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		id, err := uuid.Parse(r.PathValue("id"))
 		fmt.Println(id)
 		if err != nil {
 
-			log.Printf("uuid_conversion %v", err)
-			http.Error(w, "id conversion error", http.StatusBadRequest)
+			log.Printf("something went wrong%v", err)
+			http.Error(w, "something went wrong", http.StatusBadRequest)
 			return
 		}
 
-		result, err := db.Exec("DELETE FROM listings WHERE id=$1", id)
-		if err == sql.ErrNoRows {
-			log.Printf("List not found:%v", err)
-			http.Error(w, "List not found", http.StatusNotFound)
-			return
-		} else if err != nil {
-			log.Printf("query:%v", err)
-			http.Error(w, "List not found", http.StatusInternalServerError)
+		result, err := lh.db.Exec("DELETE FROM listings WHERE id=$1", id)
+		if  err != nil {
+			log.Printf("Delete:%v", err)
+			http.Error(w, "Internal Server error", http.StatusInternalServerError)
 			return
 		}
 		rowsAffected, err := result.RowsAffected()
 		if err != nil {
-			http.Error(w, "Error while retrieving deleted data", http.StatusInternalServerError)
+			http.Error(w, "Internal Server error", http.StatusInternalServerError)
 			return
 		}
 		if rowsAffected == 0 {
-			http.Error(w, "Error while retrieving deleted data", http.StatusInternalServerError)
+			http.Error(w, "Internal Server error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-
+w.WriteHeader(http.StatusOK)
 		response := struct {
 			Status string    `json:"status"`
-			Id     uuid.UUID `json:"id"`
+			// Id     uuid.UUID `json:"id"`
 		}{
 			Status: "List Successfully Deleted",
-			Id:     id,
+			// Id:     id,
 		}
 		json.NewEncoder(w).Encode(response)
 
 	}
-}
 
-func DeleteMultipleList(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+
+func(lh *ListingHandler) DeleteMultipleList(w http.ResponseWriter, r *http.Request) {
 		var ids []uuid.UUID
 		err := json.NewDecoder(r.Body).Decode(&ids)
 		if err != nil {
@@ -193,7 +258,7 @@ func DeleteMultipleList(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Error while decoding json data", http.StatusInternalServerError)
 			return
 		}
-		tx, err := db.Begin()
+		tx, err := lh.db.Begin()
 		if err != nil {
 			log.Printf("Error while begin transaction, %v", err)
 		}
@@ -242,4 +307,4 @@ func DeleteMultipleList(db *sql.DB) http.HandlerFunc {
 
 	}
 
-}
+

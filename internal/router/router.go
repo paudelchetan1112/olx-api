@@ -8,12 +8,14 @@ import (
 )
 
 func Router(db *sql.DB) *http.ServeMux {
+	lh:=handlers.NewListingHandler(db)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", handlers.Healthz)
-	mux.HandleFunc("GET /listings", handlers.List(db))
-	mux.HandleFunc("GET /listings/{id}", handlers.GetOneList(db))
-	mux.HandleFunc("POST /listings/", handlers.AddList(db))
-	mux.HandleFunc("DELETE /listings/{id}", handlers.DeleteOneList(db))
+	mux.HandleFunc("GET /listings", lh.Get)
+	mux.HandleFunc("GET /listings/{id}", lh.GetOne)
+	mux.HandleFunc("POST /listings/", lh.AddNew)
+	mux.HandleFunc("DELETE /listings/{id}", lh.Delete)
+
 
 	return mux
 }
